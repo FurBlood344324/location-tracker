@@ -13,8 +13,8 @@ double lat = 0.0, lng = 0.0;
 
 // === Wi-Fi & HTTP setup ===
 // Kendi ağ bilgilerinizi girin
-const char* ssid       = "S22";
-const char* password   = "A1234567";
+const char* ssid       = "your-ssid";
+const char* password   = "your-password";
 // POST endpoint
 const char* serverURL  = "https://map.arda.engineer/location";
 // POST aralığı (ms)
