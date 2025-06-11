@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en"></html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Tracking</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        .info-box {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+            font-size: 12px;
+        }
+        .control-box {
+            position: absolute;
+            bottom: 20px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+        .control-box button {
+            padding: 5px 10px;
+            margin: 2px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            background: #f0f0f0;
+        }
+        .control-box button:hover {
+            background: #e0e0e0;
+        }
+        .control-box button.active {
+            background: #4CAF50;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="info-box">
+        <div>Last Update: <span id="lastUpdate">-</span></div>
+        <div>Latitude: <span id="lat">-</span></div>
+        <div>Longitude: <span id="lng">-</span></div>
+    </div>
+    <div class="control-box">
+        <button id="toggleFollow" class="active">Follow</button>
+        <button id="centerMap">Go to Location</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([41.0082, 28.9784], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        
+        let marker = null;
+        let currentPosition = null;
+        let followMode = true;
+        
+        const customIcon = L.icon({
+            iconUrl: '/app/icon.svg',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
+        function updateLocation(lat, lng) {
+            const position = [lat, lng];
+            currentPosition = position;
+            
+            if (!marker) {
+                marker = L.marker(position, {icon: customIcon}).addTo(map);                
+                marker.bindTooltip("Current Location", {
+                    permanent: false,
+                    direction: 'top',
+                    offset: [0, -20]
+                });
+            } else {
+                marker.setLatLng(position);
+            }
+            
+            if (followMode) {
+                map.setView(position, map.getZoom());
+            }
+        
+            document.getElementById('lat').textContent = lat.toFixed(6);
+            document.getElementById('lng').textContent = lng.toFixed(6);
+            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('en-US');
+        }
+        
+        document.getElementById('toggleFollow').addEventListener('click', function() {
+            followMode = !followMode;
+            this.classList.toggle('active');
+            if (followMode && currentPosition) {
+                map.setView(currentPosition, map.getZoom());
+            }
+        });
+        
+        document.getElementById('centerMap').addEventListener('click', function() {
+            if (currentPosition) {
+                map.setView(currentPosition, map.getZoom());
+            }
+        });
+        
+        map.on('dragstart', function() {
+            if (followMode) {
+                followMode = false;
+                document.getElementById('toggleFollow').classList.remove('active');
+            }
+        });
+        
+        const eventSource = new EventSource('/events');
+        
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.lat && data.lng) {
+                updateLocation(data.lat, data.lng);
+            }
+        };
+        
+        eventSource.onerror = function(error) {
+            console.error('SSE connection error:', error);
+        };
+        
+        fetch('/location')
+            .then(res => res.json())
+            .then(data => {
+                if (data.current) {
+                    updateLocation(data.current.lat, data.current.lng);
+                }
+            })
+            .catch(err => console.error('Failed to fetch location:', err));
+    </script>
+</body>
+</html>
